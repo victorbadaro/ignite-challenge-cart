@@ -34,37 +34,35 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
 
   const addProduct = async (productId: number) => {
     try {
-      let response = await api.get('/stock');
-      const stock = response.data;
-      const productInStock = stock.find((product: Stock) => product.id === productId);
-      
-      response = await api.get(`/products/${productId}`);
-      const product = response.data;
+      let newCart = [...cart];
+      const productInTheCart = newCart.find(product => product.id === productId);
+      let response = await api.get(`/stock/${productId}`);
+      const productInTheStock: Stock = response.data;
 
-      const productInTheCart = cart.find(product => product.id === productId);
-
+      // caso o produto já exista no carrinho, somar uma quantidade à sua quantidade (amount) no carrinho
       if(productInTheCart) {
-        if(productInTheCart.amount >= productInStock.amount) {
+        if(productInTheStock.amount < productInTheCart.amount + 1) {
           toast.error('Quantidade solicitada fora de estoque');
           return;
         }
 
-        const newCart = cart.map(product => {
-          if(product.id === productInTheCart.id)
-            product.amount ++;
-
-          return product;
-        });
-
+        productInTheCart.amount ++;
         setCart(newCart);
-        localStorage.setItem('@RocketShoes:cart', JSON.stringify(cart));
+        localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart));
       } else {
-        const newCart = [ ...cart, { ...product, amount: 1 } ];
+        if(productInTheStock.amount < 1) {
+          toast.error('Quantidade solicitada fora de estoque');
+          return;
+        }
+
+        response = await api.get(`/products/${productId}`);
+        const product = response.data;
+
+        product.amount = 1;
+        newCart = [ ...newCart, product ];
 
         setCart(newCart);
-        console.log({newCart});
-        console.log({cart});
-        localStorage.setItem('@RocketShoes:cart', JSON.stringify(cart));
+        localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart));
       }
     } catch {
       toast.error('Erro na adição do produto');
@@ -73,39 +71,42 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
 
   const removeProduct = (productId: number) => {
     try {
+      const product = cart.find(product => product.id === productId);
+
+      if(!product) {
+        toast.error('Erro na remoção do produto');
+        return;
+      }
+
       const filteredCart = cart.filter(product => product.id !== productId);
 
       setCart(filteredCart);
-      localStorage.setItem('@RocketShoes:cart', JSON.stringify(cart));
+      localStorage.setItem('@RocketShoes:cart', JSON.stringify(filteredCart));
     } catch {
       toast.error('Erro na remoção do produto');
     }
   };
 
   const updateProductAmount = async ({ productId, amount }: UpdateProductAmount) => {
-    if(amount === 0)
+    if(amount <= 0)
       return;
 
     try {
+      let newCart = [...cart];
       const response = await api.get(`/stock/${productId}`);
       const productInStock = response.data;
-      const productInTheCart = cart.find(product => product.id === productId);
+      const productInTheCart = newCart.find(product => product.id === productId);
 
       if(productInTheCart) {
-        if(productInTheCart.amount >= productInStock.amount) {
+        if(productInStock.amount < amount) {
           toast.error('Quantidade solicitada fora de estoque');
           return;
         }
 
-        const newCart = cart.map(product => {
-          if(product.id === productInTheCart.id)
-            product.amount = amount;
-          
-          return product;
-        });
+        productInTheCart.amount = amount;
 
         setCart(newCart);
-        localStorage.setItem('@RocketShoes:cart', JSON.stringify(cart));
+        localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart));
       }
     } catch {
       toast.error('Erro na alteração de quantidade do produto');
